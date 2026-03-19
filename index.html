@@ -5,61 +5,91 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tennessee Weather Alerts</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f0f2f5; color: #333; }
+        .container { max-width: 800px; margin: auto; }
         .alert-card { 
-            background: white; border-left: 10px solid #d9534f; 
-            padding: 15px; margin-bottom: 10px; border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background: white; border-left: 10px solid #777; 
+            padding: 20px; margin-bottom: 15px; border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .severity-Extreme { border-left-color: #d9534f; }
-        .severity-Severe { border-left-color: #f0ad4e; }
-        .severity-Moderate { border-left-color: #5bc0de; }
-        .no-alerts { color: #555; font-style: italic; }
-        h1 { color: #333; }
+        /* Severity Colors based on NWS standard */
+        .severity-Extreme { border-left-color: #d9534f; background: #fff5f5; }
+        .severity-Severe { border-left-color: #f0ad4e; background: #fffaf0; }
+        .severity-Moderate { border-left-color: #5bc0de; background: #f0faff; }
+        .severity-Minor { border-left-color: #5cb85c; background: #f5fff5; }
+        
+        h1 { text-align: center; color: #004085; }
+        .no-alerts { text-align: center; padding: 40px; background: white; border-radius: 8px; font-style: italic; color: #666; }
+        .error-msg { color: #721c24; background: #f8d7da; padding: 15px; border-radius: 4px; border: 1px solid #f5c6cb; }
+        small { color: #666; display: block; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <h1>Active Tennessee Weather Alerts</h1>
-    <div id="alerts-container">Loading alerts...</div>
+    <div class="container">
+        <h1>Active Tennessee Weather Alerts</h1>
+        <div id="alerts-container">Loading latest alerts...</div>
+    </div>
 
     <script>
         async function fetchTNAlerts() {
             const container = document.getElementById('alerts-container');
+            
             try {
-                // Fetching active alerts for TN
-                const response = await fetch('https://api.weather.gov');
-                const data = await response.json();
-                
-                container.innerHTML = ''; // Clear loading text
+                // The NWS API requires a unique User-Agent header.
+                // Replace 'MyWeatherApp/1.0' with your own app name.
+                const response = await fetch('https://api.weather.gov', {
+                    headers: {
+                        'User-Agent': 'MyWeatherApp/1.0 (contact@example.com)',
+                        'Accept': 'application/geo+json'
+                    }
+                });
 
-                if (data.features.length === 0) {
-                    container.innerHTML = '<p class="no-alerts">No active weather alerts for Tennessee.</p>';
+                if (!response.ok) {
+                    throw new Error(`NWS API Error: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                container.innerHTML = ''; 
+
+                if (!data.features || data.features.length === 0) {
+                    container.innerHTML = '<div class="no-alerts">No active weather alerts for Tennessee at this time.</div>';
                     return;
                 }
 
                 data.features.forEach(alert => {
                     const props = alert.properties;
                     const alertDiv = document.createElement('div');
+                    
+                    // Assign class based on severity for styling
                     alertDiv.className = `alert-card severity-${props.severity}`;
                     
                     alertDiv.innerHTML = `
-                        <h3>${props.event}</h3>
-                        <p><strong>Severity:</strong> ${props.severity}</p>
-                        <p><strong>Areas:</strong> ${props.areaDesc}</p>
-                        <p>${props.headline}</p>
-                        <p><small>Expires: ${new Date(props.expires).toLocaleString()}</small></p>
+                        <h2 style="margin-top:0">${props.event}</h2>
+                        <p><strong>Areas Affected:</strong> ${props.areaDesc}</p>
+                        <p><strong>Headline:</strong> ${props.headline || 'No headline provided.'}</p>
+                        <p><strong>Instruction:</strong> ${props.instruction || 'Follow local media for updates.'}</p>
+                        <small>Issued: ${new Date(props.sent).toLocaleString()}<br>
+                        Expires: ${new Date(props.expires).toLocaleString()}</small>
                     `;
                     container.appendChild(alertDiv);
                 });
+
             } catch (error) {
-                container.innerHTML = '<p style="color:red">Error fetching weather alerts. Please try again later.</p>';
-                console.error('Error:', error);
+                container.innerHTML = `
+                    <div class="error-msg">
+                        <strong>Update Failed:</strong> ${error.message}<br>
+                        <small>Check your internet connection or the browser console (F12) for details.</small>
+                    </div>
+                `;
+                console.error('Detailed Weather Fetch Error:', error);
             }
         }
 
+        // Initial fetch
         fetchTNAlerts();
-        // Refresh every 5 minutes (300,000 ms) as recommended for time-sensitive data
+        
+        // Auto-refresh every 5 minutes
         setInterval(fetchTNAlerts, 300000);
     </script>
 </body>
