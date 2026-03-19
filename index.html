@@ -16,61 +16,61 @@
     <div id="display">Fetching live data...</div>
 
     <script>
-        async function getTNWeather() {
-            const display = document.getElementById('display');
-            
-            try {
-                // IMPORTANT: The NWS API requires a UNIQUE User-Agent.
-                // If many people use the same one, they block it.
-                // Replace 'User12345' with your name or a random string.
-                const uniqueID = 'MyApp_TN_Alerts_User_' + Math.floor(Math.random() * 10000);
-                
-                const response = await fetch('https://api.weather.gov', {
-                    headers: {
-                        'User-Agent': `${uniqueID} (contact: dev@example.com)`,
-                        'Accept': 'application/geo+json'
-                    }
-                });
+async function getTNWeather() {
+    const display = document.getElementById('display');
+    
+    try {
+        // 1. CREATE A DYNAMIC CACHE BUSTER
+        // This prevents the server from sending you a "stale" HTML error page.
+        const cacheBuster = new Date().getTime();
+        const url = `https://api.weather.gov{cacheBuster}`;
 
-                // If the server sends HTML instead of JSON, this check will catch it
-                const contentType = response.headers.get("content-type");
-                if (!response.ok || !contentType || !contentType.includes("json")) {
-                    const htmlError = await response.text();
-                    console.error("NWS returned HTML error instead of JSON:", htmlError);
-                    throw new Error(`Server returned ${response.status}. The NWS sent an HTML error page instead of data.`);
-                }
-
-                const data = await response.json();
-                
-                if (!data.features || data.features.length === 0) {
-                    display.innerHTML = '<div class="no-alerts"><h3>No active weather alerts for Tennessee.</h3></div>';
-                    return;
-                }
-
-                display.innerHTML = '';
-                data.features.forEach(item => {
-                    const p = item.properties;
-                    display.innerHTML += `
-                        <div class="alert-box">
-                            <h2 style="margin-top:0">${p.event}</h2>
-                            <p><strong>Headline:</strong> ${p.headline}</p>
-                            <p><strong>Urgency:</strong> ${p.urgency} | <strong>Severity:</strong> ${p.severity}</p>
-                            <small>Expires: ${new Date(p.expires).toLocaleString()}</small>
-                        </div>
-                    `;
-                });
-
-            } catch (err) {
-                display.innerHTML = `
-                    <div class="error-log">
-                        <strong>Error Detected:</strong> ${err.message}<br><br>
-                        <em>Tip: Press F12 and click 'Console' to see the full server response.</em>
-                    </div>
-                `;
+        // 2. USE AN EXTREMELY SPECIFIC USER-AGENT
+        // NWS will block generic scripts. Make yours unique.
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'TN_Weather_Monitor_v3_Dev_Contact_12345',
+                'Accept': 'application/geo+json' // Explicitly ask for JSON
             }
+        });
+
+        // 3. VERIFY CONTENT TYPE BEFORE PARSING
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("json")) {
+            throw new Error("NWS sent a web page instead of weather data. This usually happens during API maintenance.");
         }
 
-        getTNWeather();
+        const data = await response.json();
+        
+        if (!data.features || data.features.length === 0) {
+            display.innerHTML = '<div class="no-alerts"><h3>No active weather alerts for Tennessee.</h3></div>';
+            return;
+        }
+
+        display.innerHTML = '';
+        data.features.forEach(item => {
+            const p = item.properties;
+            display.innerHTML += `
+                <div class="alert-box">
+                    <h2 style="margin-top:0">${p.event}</h2>
+                    <p><strong>Headline:</strong> ${p.headline || 'No headline available'}</p>
+                    <p><strong>Severity:</strong> ${p.severity} | <strong>Certainty:</strong> ${p.certainty}</p>
+                    <small>Expires: ${new Date(p.expires).toLocaleString()}</small>
+                </div>
+            `;
+        });
+
+    } catch (err) {
+        display.innerHTML = `
+            <div style="background:#fff5f5; color:#b71c1c; padding:15px; border:1px solid #ffcdd2; border-radius:4px;">
+                <strong>Connection Issue:</strong> ${err.message}<br><br>
+                <em>The NWS API is notoriously unstable. If this persists, wait 10 minutes and try again.</em>
+            </div>
+        `;
+    }
+}
+
+getTNWeather();
     </script>
 </body>
 </html>
