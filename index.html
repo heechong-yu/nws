@@ -2,60 +2,65 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>TN Weather Alerts</title>
+    <title>TN Weather Monitor</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f8f9fa; }
-        .alert-box { background: white; border-left: 10px solid #dc3545; padding: 20px; margin-bottom: 15px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .no-alerts { color: #6c757d; text-align: center; margin-top: 50px; }
-        .error-log { background: #fff5f5; color: #b71c1c; padding: 15px; border: 1px solid #ffcdd2; border-radius: 4px; font-family: monospace; }
+        body { font-family: system-ui, -apple-system, sans-serif; padding: 2rem; background: #f8f9fa; }
+        .alert-card { background: white; border-left: 8px solid #004085; padding: 1.5rem; margin-bottom: 1rem; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .status-error { color: #842029; background: #f8d7da; border: 1px solid #f5c6cb; padding: 1rem; border-radius: 4px; }
+        .btn { display: inline-block; padding: 8px 16px; background: #004085; color: white; text-decoration: none; border-radius: 4px; margin-top: 10px; }
     </style>
 </head>
 <body>
-
-    <h1>Active Tennessee Weather Alerts</h1>
-    <div id="display">Fetching live data...</div>
+    <h1>Tennessee Weather Alerts</h1>
+    <div id="alerts-container">Checking National Weather Service...</div>
 
     <script>
-async function getTNWeather() {
-    const display = document.getElementById('display');
-    const url = `https://api.weather.gov{Date.now()}`;
+        async function fetchAlerts() {
+            const container = document.getElementById('alerts-container');
+            // Using a unique ID and timestamp to bypass stale server caches
+            const uniqueAgent = `TN_Alerts_App_${Math.random().toString(36).substring(7)}`;
+            const url = `https://api.weather.gov{Date.now()}`;
 
-    try {
-        const response = await fetch(url, {
-            headers: {
-                // Must be unique! Change 'MyUniqueApp' to something else.
-                'User-Agent': 'MyUniqueApp_TN_Alerts_v4 (contact: dev@example.com)',
-                'Accept': 'application/geo+json'
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'User-Agent': `${uniqueAgent} (contact: dev-support@example.com)`,
+                        'Accept': 'application/geo+json' // Explicitly request JSON
+                    }
+                });
+
+                // Check if the response is actually JSON
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("json")) {
+                    throw new Error("NWS API is currently returning a web page (HTML) instead of data.");
+                }
+
+                const data = await response.json();
+                
+                if (!data.features || data.features.length === 0) {
+                    container.innerHTML = "<p>No active alerts for Tennessee.</p>";
+                    return;
+                }
+
+                container.innerHTML = data.features.map(f => `
+                    <div class="alert-card">
+                        <h3>${f.properties.event}</h3>
+                        <p>${f.properties.headline || 'No details provided.'}</p>
+                        <small>Area: ${f.properties.areaDesc}</small>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                container.innerHTML = `
+                    <div class="status-error">
+                        <strong>API Offline:</strong> ${err.message}<br>
+                        <p>The NWS API is likely undergoing maintenance or is overloaded.</p>
+                        <a href="https://alerts.weather.gov" class="btn" target="_blank">View Manual TN Alerts Page</a>
+                    </div>
+                `;
             }
-        });
-
-        // FIX: Verify if the response is actually the JSON we asked for
-        const contentType = response.headers.get("content-type");
-        if (!response.ok || !contentType || !contentType.includes("json")) {
-            console.error("NWS returned non-JSON content:", contentType);
-            throw new Error("The NWS server is currently sending a web page instead of data. Please try again in 5 minutes.");
         }
-
-        const data = await response.json();
-        
-        if (!data.features || data.features.length === 0) {
-            display.innerHTML = '<div class="no-alerts">No active weather alerts for Tennessee.</div>';
-            return;
-        }
-
-        display.innerHTML = data.features.map(f => `
-            <div class="alert-box">
-                <h2>${f.properties.event}</h2>
-                <p>${f.properties.headline || "Check local news for details."}</p>
-            </div>
-        `).join('');
-
-    } catch (err) {
-        display.innerHTML = `<div class="error">${err.message}</div>`;
-    }
-}
-
+        fetchAlerts();
     </script>
 </body>
 </html>
-
